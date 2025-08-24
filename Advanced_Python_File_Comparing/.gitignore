@@ -1,0 +1,39 @@
+# Cache directories
+.cache/
+.crush/
+
+# Log files
+*.log
+log.txt
+
+# Report files
+comparison_report.txt
+error_report_and_fixes.md
+
+# Note files
+note.txt
+note2.txt
+
+# Version directories
+versions/
+
+# Save list directories
+save_list/
+
+# Report directories
+report/
+
+# IDE files
+*.pyc
+__pycache__/
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
