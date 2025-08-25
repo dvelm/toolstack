@@ -237,11 +237,13 @@ class OptimizedContentLoaderWorker(QObject):
     finished = pyqtSignal(list)
     error = pyqtSignal(str)
 
-    def __init__(self, folder_path, recursive, extensions=None):
+    def __init__(self, folder_path, recursive, extensions=None, include_hidden=True, include_inaccessible=True):
         super().__init__()
         self.folder_path = folder_path
         self.recursive = recursive
         self.extensions = set(ext.lower() for ext in extensions) if extensions else None
+        self.include_hidden = include_hidden
+        self.include_inaccessible = include_inaccessible
         self._is_running = True
         logger.info(f"Content loader created for {folder_path}")
 
@@ -254,11 +256,14 @@ class OptimizedContentLoaderWorker(QObject):
                 for dirpath, dirnames, filenames in os.walk(self.folder_path):
                     if not self._is_running:
                         break
-                    dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+                    # Filter directories based on include_hidden setting
+                    if not self.include_hidden:
+                        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
                     for item_name in filenames:
                         if not self._is_running:
                             break
-                        if item_name.startswith('.'):
+                        # Filter files based on include_hidden setting
+                        if not self.include_hidden and item_name.startswith('.'):
                             continue
                         ext = os.path.splitext(item_name)[1].lower()
                         if self.extensions and ext not in self.extensions:
@@ -273,14 +278,27 @@ class OptimizedContentLoaderWorker(QObject):
                                 logger.debug(f"Processed {files_processed} files")
                         except (OSError, PermissionError) as e:
                             logger.warning(f"Could not access file {full_path}: {str(e)}")
-                            continue
+                            # Include inaccessible files if the option is enabled
+                            if self.include_inaccessible:
+                                # Create a placeholder entry for inaccessible files
+                                placeholder_stats = type('stat_result', (), {
+                                    'st_mtime': 0,
+                                    'st_size': 0
+                                })()
+                                if self.extensions and ext not in self.extensions:
+                                    # Skip if extension filtering is active and this file doesn't match
+                                    pass
+                                else:
+                                    results.append((relative_path, placeholder_stats, ext, False, full_path, 0))
+                            files_processed += 1
             else:
                 try:
                     with os.scandir(self.folder_path) as entries:
                         for entry in entries:
                             if not self._is_running:
                                 break
-                            if entry.name.startswith('.'):
+                            # Filter entries based on include_hidden setting
+                            if not self.include_hidden and entry.name.startswith('.'):
                                 continue
                             try:
                                 stats = entry.stat()
@@ -293,7 +311,21 @@ class OptimizedContentLoaderWorker(QObject):
                                 files_processed += 1
                             except (OSError, PermissionError) as e:
                                 logger.warning(f"Could not access entry {entry.path}: {str(e)}")
-                                continue
+                                # Include inaccessible files if the option is enabled
+                                if self.include_inaccessible:
+                                    # Create a placeholder entry for inaccessible files
+                                    placeholder_stats = type('stat_result', (), {
+                                        'st_mtime': 0,
+                                        'st_size': 0
+                                    })()
+                                    is_dir = False  # Assume it's a file
+                                    ext = os.path.splitext(entry.name)[1].lower()
+                                    if self.extensions and ext not in self.extensions:
+                                        # Skip if extension filtering is active and this file doesn't match
+                                        pass
+                                    else:
+                                        results.append((entry.name, placeholder_stats, ext, is_dir, entry.path, 0))
+                                files_processed += 1
                 except (OSError, PermissionError) as e:
                     raise Exception(f"Cannot access directory {self.folder_path}: {e}")
             if self._is_running:
@@ -937,6 +969,21 @@ class OptimizedFilePanel(QFrame):
         filter_bar_layout = QHBoxLayout()
         panel_layout.addLayout(filter_bar_layout)
 
+        # Additional options row
+        options_layout = QHBoxLayout()
+        panel_layout.addLayout(options_layout)
+        
+        self.include_hidden_checkbox = QCheckBox("Include hidden files (starting with .)")
+        self.include_hidden_checkbox.setChecked(True)
+        options_layout.addWidget(self.include_hidden_checkbox)
+        
+        self.include_inaccessible_checkbox = QCheckBox("Include inaccessible files")
+        self.include_inaccessible_checkbox.setChecked(True)
+        self.include_inaccessible_checkbox.setToolTip("Include files that can't be accessed due to permissions")
+        options_layout.addWidget(self.include_inaccessible_checkbox)
+        
+        options_layout.addStretch()
+
         # Path label
         self.path_label = QLabel("No content loaded")
         self.path_label.setStyleSheet("padding: 4px; background-color: #2a2a2a; border-radius: 4px; font-style: italic;")
@@ -1019,6 +1066,12 @@ class OptimizedFilePanel(QFrame):
         self.cancel_button.setVisible(False)
         self.clear_highlighting()
         self.status_filter.setCurrentText("All Files")
+        # Reset filter buttons to "All" filter
+        for btn in self.filter_buttons.values():
+            btn.setStyleSheet("")
+        self.filter_buttons['all'].setStyleSheet(FILTER_HIGHLIGHT_STYLE)
+        self.active_filter_button = self.filter_buttons['all']
+        self.current_extensions = None
         self.main_window.on_panel_cleared()
 
     def _create_optimized_table_widget(self):
@@ -1101,6 +1154,10 @@ class OptimizedFilePanel(QFrame):
         for btn in self.filter_buttons.values():
             filter_bar.addWidget(btn)
         filter_bar.addStretch()
+        
+        # Initialize the "All" filter as selected by default
+        self.filter_buttons['all'].setStyleSheet(FILTER_HIGHLIGHT_STYLE)
+        self.active_filter_button = self.filter_buttons['all']
 
     def load_content(self):
         if not self.folder_path or self.is_busy:
@@ -1112,7 +1169,8 @@ class OptimizedFilePanel(QFrame):
         self.cleanup_thread()
         self.thread = QThread()
         self.worker = OptimizedContentLoaderWorker(
-            self.folder_path, self.recursive_checkbox.isChecked(), self.current_extensions
+            self.folder_path, self.recursive_checkbox.isChecked(), self.current_extensions,
+            self.include_hidden_checkbox.isChecked(), self.include_inaccessible_checkbox.isChecked()
         )
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
