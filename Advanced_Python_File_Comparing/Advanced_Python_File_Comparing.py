@@ -344,6 +344,7 @@ class SoftCompareWorker(QObject):
             left_only = set(left_files.keys()) - set(right_files.keys())
             right_only = set(right_files.keys()) - set(left_files.keys())
             identical_files, different_files, similar_files = [], [], []
+            similar_files_info = {}  # Store size information for similar files
             total_files = len(common_names)
             processed_files = 0
             logger.info(f"Comparing {total_files} common files")
@@ -351,10 +352,11 @@ class SoftCompareWorker(QObject):
                 if not self._is_running:
                     break
                 left_info, right_info = left_files[name], right_files[name]
-                if left_info['size'] == right_info['size'] and abs(left_info['mod_time'] - right_info['mod_time']) < 1:
-                    identical_files.append(name)
-                elif left_info['size'] == right_info['size']:
+                if left_info['size'] == right_info['size']:
+                    # For soft compare, files with same name and size are similar
                     similar_files.append(name)
+                    # Store size information for display
+                    similar_files_info[name] = left_info['size']
                 else:
                     different_files.append(name)
                 processed_files += 1
@@ -371,6 +373,7 @@ class SoftCompareWorker(QObject):
                 'identical_files': identical_files,
                 'different_files': different_files,
                 'similar_files': similar_files,
+                'similar_files_info': similar_files_info,  # Include size info for similar files
                 'left_only': list(left_only),
                 'right_only': list(right_only),
                 'comparison_time': comparison_time,
@@ -504,22 +507,36 @@ class SmartCompareWorker(QObject):
             self.progress.emit(self.hashed_files, 1)
 
     def _compare_hashes(self, similar_candidates):
-        identical_files, different_files = [], []
+        identical_files, different_files, similar_files = [], [], []
         left_names = {name for name, _, _, is_dir, _, _ in self.left_files_data if not is_dir}
         right_names = {name for name, _, _, is_dir, _, _ in self.right_files_data if not is_dir}
         common_names = left_names & right_names
+        
+        # Create a dictionary to store file sizes for similar files
+        similar_files_info = {}
+        left_files = {name: file_size for name, _, _, is_dir, _, file_size in self.left_files_data if not is_dir}
+        
         logger.info(f"Comparing hashes for {len(similar_candidates)} files")
         for filename in similar_candidates:
             left_hash = self.file_hashes_left.get(filename)
             right_hash = self.file_hashes_right.get(filename)
             if left_hash and right_hash:
-                (identical_files if left_hash == right_hash else different_files).append(filename)
+                if left_hash == right_hash:
+                    identical_files.append(filename)
+                else:
+                    # Files with same name/size but different hashes go to similar files
+                    similar_files.append(filename)
+                    # Store size information for display
+                    if filename in left_files:
+                        similar_files_info[filename] = left_files[filename]
+        
         different_size_files = [name for name in common_names if name not in similar_candidates]
         different_files.extend(different_size_files)
         return {
             'identical_files': identical_files,
             'different_files': different_files,
-            'similar_files': [],
+            'similar_files': similar_files,  # Smart compare now has similar files for same name/size but different hashes
+            'similar_files_info': similar_files_info,  # But we still track size info for UI consistency
             'left_only': list(left_names - right_names),
             'right_only': list(right_names - left_names)
         }
@@ -638,29 +655,27 @@ class DeepCompareWorker(QObject):
         left_names = set(self.file_hashes_left.keys())
         right_names = set(self.file_hashes_right.keys())
         common_names = left_names & right_names
+        
+        # Create a dictionary to store file sizes for similar files
+        similar_files_info = {}
+        left_files = {name: file_size for name, _, _, _, _, file_size in self.left_files_data}
+        
         logger.info(f"Comparing hashes for {len(common_names)} common files")
         for filename in common_names:
             left_hash = self.file_hashes_left[filename]
             right_hash = self.file_hashes_right[filename]
-            (identical_files if left_hash == right_hash else different_files).append(filename)
-        left_sizes = {}
-        for name, _, _, _, _, file_size in self.left_files_data:
-            if not name.startswith('.') and name in self.file_hashes_left:
-                left_sizes.setdefault(file_size, []).append(name)
-        right_sizes = {}
-        for name, _, _, _, _, file_size in self.right_files_data:
-            if not name.startswith('.') and name in self.file_hashes_right:
-                right_sizes.setdefault(file_size, []).append(name)
-        common_sizes = set(left_sizes.keys()) & set(right_sizes.keys())
-        for size in common_sizes:
-            left_names_for_size = set(left_sizes[size])
-            right_names_for_size = set(right_sizes[size])
-            size_matches = (left_names_for_size - right_names_for_size) | (right_names_for_size - left_names_for_size)
-            similar_files.extend(size_matches)
+            if left_hash == right_hash:
+                identical_files.append(filename)
+            else:
+                different_files.append(filename)
+        # For deep compare, only files with matching hashes go to identical section
+        # Files with different hashes go to different section, regardless of size
+        # No files should go to similar section in deep compare
         return {
             'identical_files': identical_files,
             'different_files': different_files,
             'similar_files': similar_files,
+            'similar_files_info': similar_files_info,  # Include size info for UI consistency
             'left_only': list(left_names - right_names),
             'right_only': list(right_names - left_names)
         }
@@ -910,7 +925,7 @@ class OptimizedFilePanel(QFrame):
             "All Files",
             "Identical Files",
             "Different Files",
-            "Similar Files",
+            "Similar Files (name and dimension)",
             f"Unique in {self.side_name}",
             f"Unique in Other"
         ])
@@ -1361,6 +1376,7 @@ class OptimizedFilePanel(QFrame):
         identical_files = set(comparison_results.get('identical_files', []))
         different_files = set(comparison_results.get('different_files', []))
         similar_files = set(comparison_results.get('similar_files', []))
+        similar_files_info = comparison_results.get('similar_files_info', {})  # Get size info for similar files
         left_only = set(comparison_results.get('left_only', []))
         right_only = set(comparison_results.get('right_only', []))
         
@@ -1396,7 +1412,13 @@ class OptimizedFilePanel(QFrame):
                 status_item.setData(Qt.ItemDataRole.UserRole, STATUS_DIFFERENT)
                 self.highlight_row(row, COLOR_DIFFERENT)
             elif file_name in similar_files:
-                status_item.setText("Similar")
+                # For similar files, display "Similar Files (name and dimension)"
+                file_size = similar_files_info.get(file_name, 0)
+                if file_size > 0:
+                    size_text = self.format_size(file_size)
+                    status_item.setText(f"Similar Files ({file_name} - {size_text})")
+                else:
+                    status_item.setText(f"Similar Files ({file_name})")
                 status_item.setData(Qt.ItemDataRole.UserRole, STATUS_SIMILAR)
                 self.highlight_row(row, COLOR_SIMILAR)
             elif file_name in left_only:
@@ -1417,7 +1439,7 @@ class OptimizedFilePanel(QFrame):
         self.status_label.setText(
             f"Comparison: {len(comparison_results.get('identical_files', []))} identical, "
             f"{len(comparison_results.get('different_files', []))} different, "
-            f"{len(comparison_results.get('similar_files', []))} similar\n"
+            f"{len(comparison_results.get('similar_files', []))} similar (name and dimension)\n"
             f"Unique files: Left({left_unique}) Right({right_unique})"
         )
         
@@ -1471,7 +1493,7 @@ class OptimizedFilePanel(QFrame):
                 hide = file_name not in identical_files
             elif filter_text == "Different Files":
                 hide = file_name not in different_files
-            elif filter_text == "Similar Files":
+            elif filter_text == "Similar Files (name and dimension)":
                 hide = file_name not in similar_files
             elif filter_text == f"Unique in {self.side_name}":
                 hide = file_name not in unique_files
@@ -1756,7 +1778,7 @@ class OptimizedFileManager(QMainWindow):
         right_unique_count = len(results.get('right_only', []))
         
         results_summary = (
-            f"Comparison: {identical_count} identical, {different_count} different, {similar_count} similar\n"
+            f"Comparison: {identical_count} identical, {different_count} different, {similar_count} similar (name and dimension)\n"
             f"Unique files: Left({left_unique_count}) Right({right_unique_count})"
         )
         
@@ -1846,22 +1868,35 @@ class OptimizedFileManager(QMainWindow):
             "Summary:",
             f"  Identical files: {len(self.last_comparison_results.get('identical_files', []))}",
             f"  Different files: {len(self.last_comparison_results.get('different_files', []))}",
-            f"  Similar files: {len(self.last_comparison_results.get('similar_files', []))}",
+            f"  Similar Files (name and dimension): {len(self.last_comparison_results.get('similar_files', []))}",
             f"  Unique files in left folder: {len(self.last_comparison_results.get('left_only', []))}",
             f"  Unique files in right folder: {len(self.last_comparison_results.get('right_only', []))}",
             "",
         ]
+        # Get similar files info for displaying size information
+        similar_files_info = self.last_comparison_results.get('similar_files_info', {})
+        
         for kind, label in [
             ('identical_files', 'Identical Files'),
             ('different_files', 'Different Files'),
-            ('similar_files', 'Similar Files'),
+            ('similar_files', 'Similar Files (name and dimension)'),
             ('left_only', 'Files Only in Left Folder'),
             ('right_only', 'Files Only in Right Folder')
         ]:
             files = self.last_comparison_results.get(kind, [])
             lines.append(f"{label}:")
             if files:
-                lines.extend(f"  - {f}" for f in sorted(files))
+                if kind == 'similar_files':
+                    # For similar files, display name with size information
+                    for f in sorted(files):
+                        file_size = similar_files_info.get(f, 0)
+                        if file_size > 0:
+                            size_text = self.left_panel.format_size(file_size)  # Use format from panel
+                            lines.append(f"  - Similar Files ({f} - {size_text})")
+                        else:
+                            lines.append(f"  - Similar Files ({f})")
+                else:
+                    lines.extend(f"  - {f}" for f in sorted(files))
             else:
                 lines.append("  (none)")
             lines.append("")
@@ -1939,22 +1974,35 @@ class OptimizedFileManager(QMainWindow):
             "Summary:",
             f"  Identical files: {len(results.get('identical_files', []))}",
             f"  Different files: {len(results.get('different_files', []))}",
-            f"  Similar files: {len(results.get('similar_files', []))}",
+            f"  Similar Files (name and dimension): {len(results.get('similar_files', []))}",
             f"  Unique files in left folder: {len(results.get('left_only', []))}",
             f"  Unique files in right folder: {len(results.get('right_only', []))}",
             "",
         ]
+        # Get similar files info for displaying size information
+        similar_files_info = results.get('similar_files_info', {})
+        
         for kind, label in [
             ('identical_files', 'Identical Files'),
             ('different_files', 'Different Files'),
-            ('similar_files', 'Similar Files'),
+            ('similar_files', 'Similar Files (name and dimension)'),
             ('left_only', 'Files Only in Left Folder'),
             ('right_only', 'Files Only in Right Folder')
         ]:
             files = results.get(kind, [])
             lines.append(f"{label}:")
             if files:
-                lines.extend(f"  - {f}" for f in sorted(files))
+                if kind == 'similar_files':
+                    # For similar files, display name with size information
+                    for f in sorted(files):
+                        file_size = similar_files_info.get(f, 0)
+                        if file_size > 0:
+                            size_text = self.left_panel.format_size(file_size)  # Use format from panel
+                            lines.append(f"  - Similar Files ({f} - {size_text})")
+                        else:
+                            lines.append(f"  - Similar Files ({f})")
+                else:
+                    lines.extend(f"  - {f}" for f in sorted(files))
             else:
                 lines.append("  (none)")
             lines.append("")
