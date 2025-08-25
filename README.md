@@ -1,6 +1,6 @@
 # ToolStack Repository
 
-This repository contains a collection of useful Python tools for various tasks.
+This repository contains a collection of useful tools for various tasks.
 
 ## Repository Structure
 
