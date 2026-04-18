@@ -1,0 +1,5 @@
+# File Mover Pro - Python Dependencies
+# No external packages required!
+# Python's built-in libraries are sufficient:
+# - tkinter (included with Python)
+# - os, shutil, threading, datetime, platform, sys (standard library)
