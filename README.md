@@ -4,9 +4,28 @@ This repository contains a collection of useful tools for various tasks.
 
 ## Repository Structure
 
-The main tool in this repository is located in the `Advanced_Python_File_Comparing` folder:
+### 1. File Mover Pro
 
-### Advanced Python File Comparing
+A cross-platform desktop application for efficiently moving or copying files with advanced filtering, sorting, and size limit options.
+
+**Location**: `File_Mover_Pro/`
+
+**Features**:
+- Move or Copy files with size limits
+- Filter by file extensions and date ranges
+- Sort by modified time or name
+- Real-time progress tracking
+- High DPI and responsive design support
+
+**Quick Start**:
+```bash
+python File_Mover_Pro/File_Mover_Pro_v2.py
+```
+Or use `run.bat` / `run.sh` in the project folder.
+
+---
+
+### 2. Advanced Python File Comparing
 An advanced file comparison tool built with PyQt6 that allows you to compare folders and files with multiple comparison methods. This tool provides a graphical interface for comparing directories and identifying identical, different, and unique files.
 
 #### Features
