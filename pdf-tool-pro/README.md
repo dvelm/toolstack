@@ -46,7 +46,18 @@ Your browser opens automatically at `http://localhost:8501`. Done!
 
 **Option C — Double-click (Windows):**
 
-Double-click `run.bat`. Your browser opens automatically.
+1. Make sure Python 3.9+ is installed and added to PATH
+2. Install dependencies: `pip install -r requirements.txt`
+3. Double-click `run.bat`. Your browser opens automatically.
+4. Close the window or press Ctrl+C to stop the app
+
+**Windows command-line options:**
+
+```batch
+run.bat           Start PDF Tool Pro (opens browser)
+run.bat --stop    Stop the running server
+run.bat --help    Show all operations and usage info
+```
 
 ---
 
