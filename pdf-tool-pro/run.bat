@@ -106,7 +106,7 @@ rem ── All good — check for existing instance ──
 echo   [OK] All dependencies satisfied!
 echo.
 
-netstat -ano | findstr /R ":%PORT%[ \t]" | findstr "LISTENING" >nul 2>&1
+netstat -ano | findstr /C:":%PORT% " | findstr "LISTENING" >nul 2>&1
 if %errorlevel% equ 0 (
     echo  [INFO] Port %PORT% is already in use.
     echo  [INFO] Opening browser to existing instance...
@@ -139,7 +139,7 @@ exit /b 0
 rem ── Stop Streamlit ──
 :stop_streamlit
 set "FOUND_COUNT=0"
-for /F "tokens=5 delims= " %%P in ('netstat -ano ^| findstr /R ":%PORT%[ \t]" ^| findstr "LISTENING"') do (
+for /F "tokens=5 delims= " %%P in ('netstat -ano ^| findstr /C:":%PORT% " ^| findstr "LISTENING"') do (
     set /A FOUND_COUNT+=1
     echo Stopping Streamlit (PID: %%P)...
     taskkill /PID %%P /F >nul 2>&1
