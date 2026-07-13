@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Run Shell Script
+Comment=Execute this shell script
+Exec=/bin/bash -c 'cd "$(dirname "%f")" && bash "%f"'
+NoDisplay=true
+MimeType=application/x-shellscript;text/x-shellscript;

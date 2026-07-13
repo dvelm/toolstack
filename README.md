@@ -65,6 +65,32 @@ An advanced file comparison tool built with PyQt6 that allows you to compare fol
 5. View results with color-coded files
 6. Generate reports or move files as needed
 
+### 3. PDF Tool Pro
+
+A modern, feature-rich PDF editing and compression tool with a beautiful web UI.
+
+**Location**: `pdf-tool-pro/`
+
+**Features**:
+- Compress PDFs (4 methods: lossless, smart, aggressive, raster)
+- Merge multiple PDFs into one
+- Split PDFs into separate pages
+- Rotate, crop, and watermark pages
+- Extract text and images
+- Select specific pages
+- View PDF metadata and info
+- Modern dark glassmorphism UI
+
+**Quick Start**:
+```bash
+cd pdf-tool-pro
+pip install -r requirements.txt
+streamlit run pdf_ui.py
+```
+Or double-click `run` on Linux / `run.bat` on Windows.
+
+---
+
 ## Future Tools
 More tools will be added to this collection over time. Check back for updates!
 

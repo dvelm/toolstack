@@ -1,0 +1,9 @@
+# PDF Tool Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core PDF library - best for editing and compression
+PyMuPDF>=1.25.0
+
+
+# Web UI framework
+streamlit>=1.0

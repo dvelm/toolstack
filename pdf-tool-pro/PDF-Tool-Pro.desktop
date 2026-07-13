@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=PDF Tool Pro
+Comment=Modern PDF Editing & Compression — Edit, compress, merge, split, rotate, crop, extract text/images, watermark, and view PDF metadata
+Exec=bash -c 'cd "$(dirname "%k")" && ./run'
+Terminal=false
+Categories=Office;Utility;
+StartupNotify=true
