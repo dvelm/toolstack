@@ -6,6 +6,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.0.2] — 2026-07-14
+
+### Fixed
+
+- **Robust Windows launcher (`run.bat`)** — Rewrote batch script to match Linux reliability
+  - Streamlit now runs in the foreground so closing the window or pressing `Ctrl+C` stops both the batch file and Streamlit
+  - Added `run.bat --stop` — finds the process listening on port 8501 via `netstat` and kills it with `taskkill`
+  - Added `run.bat --help` — shows usage and descriptions for all 10 operations
+  - Port conflict detection opens the browser to the existing instance and suggests `run.bat --stop`
+  - Removed unreliable PID-file logic that could target the wrong Python process
+
+### Changed
+
+- **UI operation descriptions** — Each of the 10 operations now shows a detailed description in the main panel when selected
+- **`run --help` descriptions** — Linux launcher now prints a short description for every operation
+- **README Windows section** — Expanded with setup steps and command-line options
+
+---
+
 ## [1.0.1] — 2026-07-13
 
 ### Fixed
